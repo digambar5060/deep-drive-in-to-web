@@ -1,1 +1,95 @@
 
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.4.25 <0.7.0;
+
+contract MetaCoin {
+	mapping (address => uint256) balances;
+
+	event Transfer(address indexed _from, address indexed _to, uint256 _value);
+
+	constructor() public {
+		balances[tx.origin] = 100000;
+	}
+
+	function sendCoin(address receiver, uint256 amount, address sender) public  returns(bool sufficient) {
+		if (balances[sender] < amount) return false;
+		balances[sender] -= amount;
+		balances[receiver] += amount;
+		emit Transfer(sender, receiver, amount);
+		return true;
+	}
+
+
+	function getBalance(address addr) public view returns(uint256) {
+		return balances[addr];
+	}
+}
+
+contract Loan is MetaCoin {
+
+    mapping (address => uint256)  private  loans;
+    address[]   private  loanaccount;
+  
+
+    function insert_in_mapping(address payable _add,uint _amt)private{
+        loans[_add]=_amt;
+        loanaccount.push(_add);
+    }
+     
+    event Request(address indexed _from, uint256 P, uint R, uint T, uint256 amt);
+    
+    address private Owner;
+
+    
+    modifier isOwner() {
+        require(msg.sender==Owner,"you are not owner");
+
+        _;
+    }
+    
+    constructor() public {
+         Owner=msg.sender;
+    }
+    
+    
+    function getCompoundInterest(uint256 principle, uint rate, uint time) public pure returns(uint256) {
+        require((principle*rate*time)>100,"too small amount");
+    		return principle+=(principle*rate*time)/100;
+        
+    }
+    
+    function reqLoan(uint256 principle, uint rate, uint time,address payable creditor) public returns(bool correct) {
+        uint256 toPay = getCompoundInterest(principle, rate, time);
+        if(getOwnerBalance()<toPay) return false;
+        insert_in_mapping(creditor,toPay);
+        emit Request(msg.sender,principle,rate,time,toPay);
+
+
+
+        
+    }
+    
+    function getOwnerBalance() public view returns(uint256) {
+			 return MetaCoin.getBalance(Owner);
+		}
+    
+    function viewdues(address  _add)public isOwner  view returns(uint){
+        for(uint i=0;i<loanaccount.length;i++){
+            if(loanaccount[i]==_add){
+                return loans[_add];
+            }
+        }
+    }
+
+    function settleDues(address payable    _add)public isOwner   returns(bool){
+        uint a = viewdues(_add);
+        if(balances[Owner]>=a){
+            loans[_add]=0;
+        }
+
+        return sendCoin(_add,a,msg.sender);
+
+    }
+    
+    
+}
