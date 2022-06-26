@@ -27,13 +27,15 @@ contract MetaCoin {
 
 contract Loan is MetaCoin {
 
-    mapping (address => uint256)  private  loans;
-    address[]   private  loanaccount;
+    mapping (address => uint256)  private  loans;        // mapping to address which owner owes loan 
+    address[]   private  loanaccount;             
+    mapping (address=>uint)private maxaddress;           //mapping for find maxaddress to find max owes address
   
 
-    function insert_in_mapping(address payable _add,uint _amt)private{
+    function insert_in_mapping(address payable _add,uint _amt)private{  //insert in map(maxaddress,loans) after successfully reqloan 
         loans[_add]=_amt;
         loanaccount.push(_add);
+        maxaddress[_add]+=_amt;
     }
      
     event Request(address indexed _from, uint256 P, uint R, uint T, uint256 amt);
@@ -41,24 +43,24 @@ contract Loan is MetaCoin {
     address private Owner;
 
     
-    modifier isOwner() {
+    modifier isOwner() {                                   //make modifier to check for msg.sender is owner 
         require(msg.sender==Owner,"you are not owner");
 
         _;
     }
     
-    constructor() public {
+    constructor() public {     //contructor for make owner 
          Owner=msg.sender;
     }
     
     
-    function getCompoundInterest(uint256 principle, uint rate, uint time) public pure returns(uint256) {
+    function getCompoundInterest(uint256 principle, uint rate, uint time) public pure returns(uint256) {  //make function to find compound interest 
         require((principle*rate*time)>100,"too small amount");
     		return principle+=(principle*rate*time)/100;
         
     }
     
-    function reqLoan(uint256 principle, uint rate, uint time,address payable creditor) public returns(bool correct) {
+    function reqLoan(uint256 principle, uint rate, uint time,address payable creditor) public returns(bool correct) { //make function to owes loan req to owner and if valid insert address to map 
         uint256 toPay = getCompoundInterest(principle, rate, time);
         if(getOwnerBalance()<toPay) return false;
         insert_in_mapping(creditor,toPay);
@@ -69,11 +71,11 @@ contract Loan is MetaCoin {
         
     }
     
-    function getOwnerBalance() public view returns(uint256) {
+    function getOwnerBalance() public view returns(uint256) {   //make function to check owner balance 
 			 return MetaCoin.getBalance(Owner);
 		}
     
-    function viewdues(address  _add)public isOwner  view returns(uint){
+    function viewdues(address  _add)public isOwner  view returns(uint){   // make function to view dues and only can see it 
         for(uint i=0;i<loanaccount.length;i++){
             if(loanaccount[i]==_add){
                 return loans[_add];
@@ -81,14 +83,24 @@ contract Loan is MetaCoin {
         }
     }
 
-    function settleDues(address payable    _add)public isOwner   returns(bool){
+    function settleDues(address payable    _add)public isOwner   returns(bool){  // make function to settle dues and only owner can see it 
         uint a = viewdues(_add);
         if(balances[Owner]>=a){
             loans[_add]=0;
         }
-
         return sendCoin(_add,a,msg.sender);
 
+    }
+    function getMaxAddress()public view returns(address,uint){  // make a function to see that address which owner owes most coin 
+        address maxowes;
+        uint maxx=0;
+        for(uint i=0;i<loanaccount.length;i++){
+            if(maxaddress[loanaccount[i]]>maxx){
+                maxowes=loanaccount[i];
+                maxx=maxaddress[loanaccount[i]];
+            }
+        }
+        return (maxowes,maxx);
     }
     
     
